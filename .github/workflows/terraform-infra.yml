@@ -11,10 +11,14 @@ on:
 
     workflow_dispatch:
         inputs:
-            target_env:
-                description: "Target environment"
+            env:
+                description: 'Select the environment'
                 required: true
-                default: "dev"
+                default: 'dev'
+                type: choice
+                options:
+                    - dev
+                    - prod
 
 permissions:
     id-token: write
@@ -24,6 +28,7 @@ jobs:
     validate-and-plan:
         name: Validate Terraform
         runs-on: ubuntu-latest
+        environment: ${{ github.event.inputs.env }}
 
         steps:
             - name: Checkout code
@@ -42,7 +47,7 @@ jobs:
 
             - name: Terraform Init
               run: terraform init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
-                  -backend-config="prefix=terraform/state-dev" \
+                  -backend-config="prefix=terraform/state-${{ github.event.inputs.env }}" \
                   -backend-config="project=${{ secrets.GCP_PROJECT_ID }}" \
                   -backend-config="location=${{ secrets.GCP_REGION }}"
 
@@ -50,18 +55,18 @@ jobs:
               run: terraform validate
 
             - name: Terraform Plan
-              run: terraform plan -out=plan-dev.tfplan \
+              run: terraform plan -out=plan-${{ github.event.inputs.env }}.tfplan \
                   -var="project=${{ secrets.GCP_PROJECT_ID }}" \
                   -var="region=${{ secrets.GCP_REGION }}" \
                   -var="state_bucket=${{ secrets.TF_STATE_BUCKET }}" \
-                  -var="env=dev"
+                  -var="env=${{ github.event.inputs.env }}"
 
-    apply-dev:
-        name: Apply Terraform to Dev
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    apply:
+        name: Apply Terraform
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
         needs: validate-and-plan
         environment:
-            name: dev
+            name: ${{ github.event.inputs.env }}  # Use the environment specified in the workflow_dispatch input
         runs-on: ubuntu-latest
 
         steps:
@@ -81,48 +86,9 @@ jobs:
 
             - name: Terraform Init
               run: terraform init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
-                  -backend-config="prefix=terraform/state-dev" \
+                  -backend-config="prefix=terraform/state-${{ github.event.inputs.env }}" \
                   -backend-config="project=${{ secrets.GCP_PROJECT_ID }}" \
                   -backend-config="location=${{ secrets.GCP_REGION }}"
 
             - name: Terraform Apply
-              run: terraform apply -auto-approve plan-dev.tfplan
-
-    apply-prod:
-        name: Apply Terraform to Prod
-        needs: validate-and-plan
-        environment:
-            name: prod
-        runs-on: ubuntu-latest
-        if: github.event.inputs.target_env == 'prod'
-
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v3
-
-            - name: Set up Google Cloud credentials
-              uses: google-github-actions/auth@v1
-              with:
-                  credentials_json: ${{ secrets.GCP_SA_KEY }}
-                  project_id: ${{ secrets.GCP_PROJECT_ID }}
-
-            - name: Install Terraform
-              uses: hashicorp/setup-terraform@v2
-              with:
-                  terraform_wrapper: false
-
-            - name: Terraform Init
-              run: terraform init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
-                  -backend-config="prefix=terraform/state-prod" \
-                  -backend-config="project=${{ secrets.GCP_PROJECT_ID }}" \
-                  -backend-config="location=${{ secrets.GCP_REGION }}"
-
-            - name: Terraform Plan for Prod
-              run: terraform plan -out=plan-prod.tfplan \
-                  -var="project=${{ secrets.GCP_PROJECT_ID }}" \
-                  -var="region=${{ secrets.GCP_REGION }}" \
-                  -var="state_bucket=${{ secrets.TF_STATE_BUCKET }}" \
-                  -var="env=prod"
-
-            - name: Terraform Apply to Prod
-              run: terraform apply -auto-approve plan-prod.tfplan
+              run: terraform apply -auto-approve plan-${{ github.event.inputs.env }}.tfplan
