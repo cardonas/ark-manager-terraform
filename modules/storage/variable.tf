@@ -12,4 +12,4 @@ variable "bucket_name" {
   description = "Bucket name for source code storage"
   type        = string
 }
-  
+
