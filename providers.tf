@@ -5,10 +5,7 @@ provider "google" {
 
 terraform {
   backend "gcs" {
-    project  = var.project
-    location = var.region
-    bucket   = var.state_bucket
-    prefix   = "terraform/state"
-
+    bucket = var.state_bucket
+    prefix = "terraform/state"
   }
 }
