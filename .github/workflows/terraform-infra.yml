@@ -3,56 +3,27 @@ name: Terraform CI/CD
 on:
     pull_request:
         branches:
-            - main  # Run CI checks on pull requests targeting main
+            - main  # Validate on pull requests to main
 
     push:
         branches:
-            - main  # Run Terraform Apply only on pushes to main
+            - main  # Deploy to dev on push to main
+
+    workflow_dispatch:
+        inputs:
+            target_env:
+                description: "Target environment"
+                required: true
+                default: "dev"
 
 permissions:
-    id-token: write
     contents: read
-    actions: read
-
+    id-token: write
+    secrets: read
+  
 jobs:
     validate-and-plan:
         name: Validate Terraform
-        runs-on: ubuntu-latest
-
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v3
-
-            - name: Set up Google Cloud credentials
-              uses: google-github-actions/auth@v1
-              with:
-                  credentials_json: ${{ secrets.GCP_SA_KEY }}  # Use GCP Service Account JSON key
-                  project_id: ${{ secrets.GCP_PROJECT_ID }}
-
-            - name: Install Terraform
-              uses: hashicorp/setup-terraform@v2
-              with:
-                  terraform_wrapper: false
-
-            - name: Terraform Init
-              run: terraform init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
-                  -backend-config="prefix=terraform/state" \
-                  -backend-config="project=${{ secrets.GCP_PROJECT_ID }}" \
-                  -backend-config="location=${{ secrets.GCP_REGION }}"
-
-            - name: Terraform Validate
-              run: terraform validate
-
-            - name: Terraform Plan
-              run: terraform plan -out=plan.tfplan -var="project=${{ secrets.GCP_PROJECT_ID }}" \
-                  -var="region=${{ secrets.GCP_REGION }}" \
-                  -var="state_bucket=${{ secrets.TF_STATE_BUCKET }}"
-                  -var="env=${{ secrets.ENV }}"
-
-    apply:
-        name: Apply Terraform
-        needs: validate-and-plan
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         runs-on: ubuntu-latest
 
         steps:
@@ -72,9 +43,87 @@ jobs:
 
             - name: Terraform Init
               run: terraform init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
-                  -backend-config="prefix=terraform/state" \
+                  -backend-config="prefix=terraform/state-dev" \
+                  -backend-config="project=${{ secrets.GCP_PROJECT_ID }}" \
+                  -backend-config="location=${{ secrets.GCP_REGION }}"
+
+            - name: Terraform Validate
+              run: terraform validate
+
+            - name: Terraform Plan
+              run: terraform plan -out=plan-dev.tfplan \
+                  -var="project=${{ secrets.GCP_PROJECT_ID }}" \
+                  -var="region=${{ secrets.GCP_REGION }}" \
+                  -var="state_bucket=${{ secrets.TF_STATE_BUCKET }}" \
+                  -var="env=dev"
+
+    apply-dev:
+        name: Apply Terraform to Dev
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        needs: validate-and-plan
+        environment:
+            name: dev
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v3
+
+            - name: Set up Google Cloud credentials
+              uses: google-github-actions/auth@v1
+              with:
+                  credentials_json: ${{ secrets.GCP_SA_KEY }}
+                  project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+            - name: Install Terraform
+              uses: hashicorp/setup-terraform@v2
+              with:
+                  terraform_wrapper: false
+
+            - name: Terraform Init
+              run: terraform init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+                  -backend-config="prefix=terraform/state-dev" \
                   -backend-config="project=${{ secrets.GCP_PROJECT_ID }}" \
                   -backend-config="location=${{ secrets.GCP_REGION }}"
 
             - name: Terraform Apply
-              run: terraform apply -auto-approve plan.tfplan
+              run: terraform apply -auto-approve plan-dev.tfplan
+
+    apply-prod:
+        name: Apply Terraform to Prod
+        needs: validate-and-plan
+        environment:
+            name: prod
+        runs-on: ubuntu-latest
+        if: github.event.inputs.target_env == 'prod'
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v3
+
+            - name: Set up Google Cloud credentials
+              uses: google-github-actions/auth@v1
+              with:
+                  credentials_json: ${{ secrets.GCP_SA_KEY }}
+                  project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+            - name: Install Terraform
+              uses: hashicorp/setup-terraform@v2
+              with:
+                  terraform_wrapper: false
+
+            - name: Terraform Init
+              run: terraform init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+                  -backend-config="prefix=terraform/state-prod" \
+                  -backend-config="project=${{ secrets.GCP_PROJECT_ID }}" \
+                  -backend-config="location=${{ secrets.GCP_REGION }}"
+
+            - name: Terraform Plan for Prod
+              run: terraform plan -out=plan-prod.tfplan \
+                  -var="project=${{ secrets.GCP_PROJECT_ID }}" \
+                  -var="region=${{ secrets.GCP_REGION }}" \
+                  -var="state_bucket=${{ secrets.TF_STATE_BUCKET }}" \
+                  -var="env=prod"
+
+            - name: Terraform Apply to Prod
+              run: terraform apply -auto-approve plan-prod.tfplan
