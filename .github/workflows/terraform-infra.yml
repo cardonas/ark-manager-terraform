@@ -17,10 +17,9 @@ on:
                 default: "dev"
 
 permissions:
-    contents: read
     id-token: write
-    secrets: read
-  
+    contents: read
+
 jobs:
     validate-and-plan:
         name: Validate Terraform
