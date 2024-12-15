@@ -1,24 +1,16 @@
-name: Terraform CI/CD
-
 on:
-    pull_request:
-        branches:
-            - main  # Validate on pull requests to main
-
     push:
         branches:
-            - main  # Deploy to dev on push to main
-
+            - main
+    pull_request:
+        branches:
+            - main
     workflow_dispatch:
         inputs:
             env:
-                description: 'Select the environment'
+                description: 'The environment to deploy to (e.g., dev, prod)'
                 required: true
                 default: 'dev'
-                type: choice
-                options:
-                    - dev
-                    - prod
 
 permissions:
     id-token: write
@@ -28,7 +20,7 @@ jobs:
     validate-and-plan:
         name: Validate Terraform
         runs-on: ubuntu-latest
-        environment: ${{ github.event.inputs.env }}
+        environment: ${{ github.event.inputs.env || 'dev' }}
 
         steps:
             - name: Checkout code
@@ -37,9 +29,9 @@ jobs:
             - name: Set up Google Cloud credentials
               uses: google-github-actions/auth@v1
               with:
-                  workload_identity_provider: 'projects/186767184162/locations/global/workloadIdentityPools/github/providers/github'
+                  credentials_json: ${{ secrets.GCP_SA_KEY }}
                   project_id: ${{ secrets.GCP_PROJECT_ID }}
-                  service_account: 'terraform@ark-manager-shadow-dev.iam.gserviceaccount.com'
+
 
             - name: Install Terraform
               uses: hashicorp/setup-terraform@v2
@@ -47,24 +39,26 @@ jobs:
                   terraform_wrapper: false
 
             - name: Terraform Init
-              run: terraform init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" -backend-config="prefix=terraform/state-${{ github.event.inputs.env }}"
+              run: terraform init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" -backend-config="prefix=terraform/state/${{ github.event.inputs.env }}"
 
             - name: Terraform Validate
               run: terraform validate
 
             - name: Terraform Plan
-              run: terraform plan -out=plan-${{ github.event.inputs.env }}.tfplan \
+              run: |
+                terraform plan -out=plan-${{ github.event.inputs.env }}.tfplan \
                   -var="project=${{ secrets.GCP_PROJECT_ID }}" \
                   -var="region=${{ secrets.GCP_REGION }}" \
-                  -var="state_bucket=${{ secrets.TF_STATE_BUCKET }}" \
+                  -var="state_bucket=${{ secrets.TF_STATE_BUCKET }}-${{ github.events.inputs.env }}" \
                   -var="env=${{ github.event.inputs.env }}"
+
 
     apply:
         name: Apply Terraform
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
         needs: validate-and-plan
         environment:
-            name: ${{ github.event.inputs.env }}  # Use the environment specified in the workflow_dispatch input
+            name: ${{ github.event.inputs.env || 'dev' }}  # Use the environment specified in the workflow_dispatch input
         runs-on: ubuntu-latest
 
         steps:

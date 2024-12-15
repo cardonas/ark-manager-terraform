@@ -1,4 +1,6 @@
-resource "google_storage_bucket" "bucket" {
-  name     = var.bucket_name
+resource "google_storage_bucket" "artifact_bucket" {
+  name     = "artifacts-${var.env != "" ? var.env : "dev"}"
   location = var.region
 }
+
+

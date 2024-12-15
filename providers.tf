@@ -6,6 +6,6 @@ provider "google" {
 terraform {
   backend "gcs" {
     bucket = var.state_bucket
-    prefix = "terraform/state"
+    prefix = "terraform/state/${var.env}"
   }
 }

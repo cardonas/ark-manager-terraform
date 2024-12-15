@@ -15,12 +15,14 @@ variable "env" {
   default     = "dev" # Default value if not set in GitHub Actions
 }
 
-variable "function_name" {
-  description = "Name of the Cloud Function"
-}
-
 variable "state_bucket" {
   description = "Bucket name for Terraform state"
   type        = string
   default     = "tfstate"
+}
+
+variable "function_name" {
+  description = "function_name"
+  type        = string
+  default     = ""
 }
