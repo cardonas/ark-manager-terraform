@@ -39,7 +39,6 @@ jobs:
               with:
                   workload_identity_provider: 'projects/186767184162/locations/global/workloadIdentityPools/github/providers/github'
                   project_id: ${{ secrets.GCP_PROJECT_ID }}
-                  service_account: terraform@ark-manager-shadow-dev.iam.gserviceaccount.com
 
             - name: Install Terraform
               uses: hashicorp/setup-terraform@v2
