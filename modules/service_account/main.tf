@@ -1,4 +1,4 @@
 resource "google_service_account" "function_account" {
-  account_id   = "function-account"
-  display_name = "Cloud Function Service Account"
+  account_id   = "ark-manager-func-sa-${var.env != "" ? var.env : "dev"}"
+  display_name = "Cloud Function Service Account - ${var.env}"
 }

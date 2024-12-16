@@ -13,7 +13,7 @@ variable "function_name" {
   type        = string
 }
 
-variable "function_bucket" {
+variable "artifact_bucket" {
   description = "Bucket name for the Cloud Function source"
   type        = string
 }
