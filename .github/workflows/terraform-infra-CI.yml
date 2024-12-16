@@ -1,0 +1,49 @@
+on:
+    pull_request:
+        branches:
+            - main
+
+permissions:
+    id-token: write
+    contents: read
+
+jobs:
+    validate-and-plan:
+        name: Validate Terraform
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v3
+
+            - name: Set up Google Cloud credentials
+              uses: google-github-actions/auth@v1
+              with:
+                  credentials_json: ${{ secrets.GCP_SA_KEY }}
+                  project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+
+            - name: Install Terraform
+              uses: hashicorp/setup-terraform@v2
+              with:
+                  terraform_wrapper: false
+
+            - name: Terraform Init
+              run: terraform init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" -backend-config="prefix=terraform/state/ci"
+
+            - name: Terraform Validate
+              run: terraform validate
+
+            - name: Terraform Plan
+              run: |
+                terraform plan -out=plan-ci.tfplan \
+                  -var="project=${{ secrets.GCP_PROJECT_ID }}" \
+                  -var="region=${{ secrets.GCP_REGION }}" \
+                  -var="state_bucket=${{ secrets.TF_STATE_BUCKET }}-ci" \
+                  -var="env=ci"
+
+            - name: Terraform Apply
+              run: terraform apply -auto-approve plan-ci.tfplan
+
+            - name: Terraform Destroy
+              run: terraform apply -auto-approve -destroy -var="project=${{ secrets.GCP_PROJECT_ID }}"
