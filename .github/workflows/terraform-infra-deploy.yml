@@ -8,6 +8,9 @@ on:
                 description: 'The environment to deploy to (e.g., dev, prod)'
                 required: true
                 default: 'dev'
+                options:
+                    - dev
+                    - prod
 
 permissions:
     id-token: write
