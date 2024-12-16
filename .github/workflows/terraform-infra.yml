@@ -77,10 +77,7 @@ jobs:
                   terraform_wrapper: false
 
             - name: Terraform Init
-              run: terraform init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
-                  -backend-config="prefix=terraform/state-${{ github.event.inputs.env }}" \
-                  -backend-config="project=${{ secrets.GCP_PROJECT_ID }}" \
-                  -backend-config="location=${{ secrets.GCP_REGION }}"
+              run: terraform init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" -backend-config="prefix=terraform/state/${{ github.event.inputs.env }}"
 
             - name: Terraform Apply
               run: terraform apply -auto-approve plan-${{ github.event.inputs.env }}.tfplan
