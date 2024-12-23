@@ -13,14 +13,9 @@ variable "function_name" {
   type        = string
 }
 
-variable "artifact_bucket" {
-  description = "Bucket name for the Cloud Function source"
-  type        = string
-}
-
-variable "function_source" {
-  description = "Path to the Cloud Function source archive"
-  type        = string
+variable "source_repo" {
+  description = "Github repository for the source code"
+  type = string
 }
 
 variable "service_account_email" {
