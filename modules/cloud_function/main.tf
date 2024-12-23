@@ -1,5 +1,6 @@
 resource "google_cloudfunctions_function" "function" {
   name                  = var.function_name
+  region                = var.region
   runtime               = "python310"
   entry_point           = "main"
   source_archive_bucket = var.artifact_bucket
