@@ -9,12 +9,6 @@ variable "region" {
   default     = "us-central1"
 }
 
-variable "source_repo" {
-  description = "Source Repo Url"
-  type = string
-  default = ""
-}
-
 variable "env" {
   description = "Environment identifier"
   type        = string
